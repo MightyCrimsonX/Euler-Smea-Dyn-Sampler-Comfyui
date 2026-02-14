@@ -29,9 +29,12 @@ class _Rescaler:
         self.mode = mode
         self.extra_args = extra_args
         if BACKEND == "WebUI":
-            self.init_latent, self.mask, self.nmask = model.init_latent, model.mask, model.nmask
+            self.init_latent = getattr(model, 'init_latent', None)
+            self.mask = getattr(model, 'mask', None)
+            self.nmask = getattr(model, 'nmask', None)
         if BACKEND == "ComfyUI":
-            self.latent_image, self.noise = model.latent_image, model.noise
+            self.latent_image = getattr(model, 'latent_image', None)
+            self.noise = getattr(model, 'noise', None)
             self.denoise_mask = self.extra_args.get("denoise_mask", None)
 
     def __enter__(self):
@@ -46,7 +49,7 @@ class _Rescaler:
             if self.latent_image is not None:
                 self.model.latent_image = torch.nn.functional.interpolate(input=self.latent_image, size=self.x.shape[2:4], mode=self.mode)
             if self.noise is not None:
-                self.model.noise = torch.nn.functional.interpolate(input=self.latent_image, size=self.x.shape[2:4], mode=self.mode)
+                self.model.noise = torch.nn.functional.interpolate(input=self.noise, size=self.x.shape[2:4], mode=self.mode)
             if self.denoise_mask is not None:
                 self.extra_args["denoise_mask"] = torch.nn.functional.interpolate(input=self.denoise_mask, size=self.x.shape[2:4], mode=self.mode)
 
@@ -54,11 +57,17 @@ class _Rescaler:
 
     def __exit__(self, type, value, traceback):
         if BACKEND == "WebUI":
-            del self.model.init_latent, self.model.mask, self.model.nmask
-            self.model.init_latent, self.model.mask, self.model.nmask = self.init_latent, self.mask, self.nmask
+            if hasattr(self.model, 'init_latent'): del self.model.init_latent
+            if hasattr(self.model, 'mask'): del self.model.mask
+            if hasattr(self.model, 'nmask'): del self.model.nmask
+            if self.init_latent is not None: self.model.init_latent = self.init_latent
+            if self.mask is not None: self.model.mask = self.mask
+            if self.nmask is not None: self.model.nmask = self.nmask
         if BACKEND == "ComfyUI":
-            del self.model.latent_image, self.model.noise
-            self.model.latent_image, self.model.noise = self.latent_image, self.noise
+            if hasattr(self.model, 'latent_image'): del self.model.latent_image
+            if hasattr(self.model, 'noise'): del self.model.noise
+            if self.latent_image is not None: self.model.latent_image = self.latent_image
+            if self.noise is not None: self.model.noise = self.noise
 
 
 def default_noise_sampler(x):
@@ -270,3 +279,4 @@ def sample_Kohaku_LoNyu_Yog(model, x, sigmas, extra_args=None, callback=None, di
         else:
             x = x + d * dt
     return x
+
